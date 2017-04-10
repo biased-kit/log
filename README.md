@@ -1,9 +1,10 @@
 # The Log
-The log serves to output some info. The info is related to different aspect and serves various goals. Let's consider for example following info types:
- * Errors - this info says that end user wasn't lucky to get result. it should include the details helping to investigate the problem.
- * Warning - says that the systems is not working as expected, and it has to use backup plan to return the right result. This is the errors that system can handle.
- * Info - sometimes you app should provide kind of "progress bar" info. Especially if you develop a console app. Usually you want to print this to stdout while other types are printed to stderr.
- * Debug - this messages should be still well formated and readable. Debug=Verbose. Keep in mind that there will be an other person who read it and try to solve a problem. 
+This package provides helpers to conveniently put errors and debug info into tracer instance (see https://github.com/opentracing/opentracing-go). 
 
- Thought it has similar names with classical log levels, it is not the same.
- Each type has own input params and behavior. The Debug info is not outputed by default, one need to put special context (WithDebug) to make it happen.
+## Log errors
+An error should be of type biased-kit/errors.E, it include error context and stack trace.
+An error should be recorded within the span (see opentracing spec) that raises the error. I.e. when you're going to transmit an error to caller goroutine don't forget to execute logger.
+
+## Log debug
+By default Debug recording is off and could be turned on by context (see WithDebug func).
+

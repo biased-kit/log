@@ -2,56 +2,112 @@ package log
 
 import (
 	"context"
-	"fmt"
 	"testing"
+
+	"github.com/biased-kit/errors"
+	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/log"
 )
 
-func TestWithGID(t *testing.T) {
-	gid := GID()
-	ctx := context.Background()
-
-	ctx = WithGID(ctx)
-	got := ctx.Value(gidKey).(string)
-	if got != gid {
-		t.Fatal(got)
-	}
-
-	ctx = WithGID(ctx)
-	got = ctx.Value(gidKey).(string)
-	if got != gid+"."+gid {
-		t.Fatal(got)
+func TestDefaultDebug(t *testing.T) {
+	spn, ctx := ctxWithSpan()
+	Debug(ctx, "test msg", "key1", "value1")
+	if len(spn.vals) != 0 {
+		t.Fail()
 	}
 }
 
 func TestDebug(t *testing.T) {
-	buf := new(debuf)
-	lgr := New(buf)
-	ctx := context.Background()
-
-	lgr.Debug(ctx, "msg", "test")
-	if buf.msg != "" {
-		t.Fatal(*buf)
-	}
-
+	spn, ctx := ctxWithSpan()
 	ctx = WithDebug(ctx)
 
-	lgr.Debug(ctx, "msg", "test")
-	if buf.fname != "TestDebug" {
-		t.Fatal(buf.fname)
+	Debug(ctx, "test msg", "key1", "value1")
+	if spn.vals["msg"] != "test msg" {
+		t.Fail()
 	}
 }
 
-type debuf struct {
-	fname string
-	msg   string
+func TestError(t *testing.T) {
+	e := errors.New("test_err")
+	spn, ctx := ctxWithSpan()
+	Error(ctx, e)
+
+	_, ok := spn.vals["stack"]
+	if !ok {
+		t.Fail()
+	}
 }
 
-func (s *debuf) Record(ctx context.Context, knd kind, msg string, keyvals []interface{}) (err error) {
-	kv := keyvals[len(keyvals)-6:]
+func TestNoError(t *testing.T) {
 
-	branch, gid, file, line, _, fname := kv[0], kv[1], kv[2], kv[3], kv[4], kv[5]
-	s.msg = fmt.Sprintf(" [%s.%s] %s:%d ", branch, gid, file, line)
-	s.fname = fname.(string)
+	spn, ctx := ctxWithSpan()
+	Error(ctx, nil)
 
+	if len(spn.vals) > 1 || spn.vals["lvl"] != "error" {
+		t.Fatalf("unxepected keyvals: %v", spn.vals)
+	}
+}
+
+func TestConextWithoutSpan(t *testing.T) {
+	// should not panic
+	ctx := context.Background()
+	Debug(ctx, "test msg")
+
+	e := errors.New("test err")
+	Error(ctx, e)
+}
+
+func ctxWithSpan() (*span, context.Context) {
+	ctx := context.Background()
+	spn := &span{}
+	ctx = opentracing.ContextWithSpan(ctx, spn)
+	return spn, ctx
+}
+
+type span struct {
+	keyvals []interface{}
+	vals    map[string]interface{}
+}
+
+func (s *span) LogKV(alternatingKeyValues ...interface{}) {
+	s.keyvals = alternatingKeyValues
+	s.vals = kv2map(s.keyvals)
+}
+
+func kv2map(kv []interface{}) map[string]interface{} {
+	m := map[string]interface{}{}
+	for i := 0; i < len(kv); i += 2 {
+		m[kv[i].(string)] = kv[i+1]
+	}
+	return m
+}
+
+func (*span) Finish() {}
+
+func (*span) FinishWithOptions(opts opentracing.FinishOptions) {}
+func (*span) Context() opentracing.SpanContext {
 	return nil
 }
+
+func (*span) SetOperationName(operationName string) opentracing.Span {
+	return nil
+}
+func (*span) SetTag(key string, value interface{}) opentracing.Span {
+	return nil
+}
+
+func (*span) LogFields(fields ...log.Field) {}
+
+func (*span) SetBaggageItem(restrictedKey, value string) opentracing.Span {
+	return nil
+}
+func (*span) BaggageItem(restrictedKey string) string {
+	return ""
+}
+func (*span) Tracer() opentracing.Tracer {
+	return nil
+}
+
+func (*span) LogEvent(event string)                                 {}
+func (*span) LogEventWithPayload(event string, payload interface{}) {}
+func (*span) Log(data opentracing.LogData)                          {}
