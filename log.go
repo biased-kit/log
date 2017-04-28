@@ -42,6 +42,7 @@ func Debug(ctx context.Context, msg string, keyvals ...interface{}) {
 		c := newCall(pc)
 		kv = append(kv, "caller", fmt.Sprintf("%+v", c))
 	}
+
 	kv = append(kv, keyvals...)
 	span.LogKV(kv...)
 }
@@ -60,9 +61,15 @@ func Error(ctx context.Context, e errors.E) {
 	}
 
 	keyvals := e.KeyValues()
-	kv := make([]interface{}, 0, len(keyvals)+6)
+	kv := make([]interface{}, 0, len(keyvals)+8)
 	kv = append(kv, "lvl", "error")
 	kv = append(kv, "msg", e.Error())
+
+	pc, _, _, ok := runtime.Caller(1)
+	if ok {
+		c := newCall(pc)
+		kv = append(kv, "caller", fmt.Sprintf("%+v", c))
+	}
 
 	stk := stack(e.StackTrace())
 	kv = append(kv, "stack", fmt.Sprint(stk))
