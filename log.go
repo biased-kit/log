@@ -3,9 +3,9 @@ package log
 import (
 	"context"
 	"fmt"
-	"runtime"
 
 	"github.com/biased-kit/errors"
+	"github.com/biased-kit/stack"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 )
@@ -68,11 +68,8 @@ func (OTLogger) Debug(ctx context.Context, msg string, keyvals ...interface{}) {
 	kv := make([]interface{}, 0, len(keyvals)+6)
 	kv = append(kv, "lvl", "debug", "msg", msg)
 
-	pc, _, _, ok := runtime.Caller(1)
-	if ok {
-		c := newCall(pc)
-		kv = append(kv, "caller", fmt.Sprintf("%+v", c))
-	}
+	c := stack.Caller(1)
+	kv = append(kv, "caller", fmt.Sprintf("%+v", c))
 
 	kv = append(kv, keyvals...)
 	span.LogKV(kv...)
@@ -96,14 +93,11 @@ func (OTLogger) Error(ctx context.Context, e errors.E) {
 	kv = append(kv, "lvl", "error")
 	kv = append(kv, "msg", e.Error())
 
-	pc, _, _, ok := runtime.Caller(1)
-	if ok {
-		c := newCall(pc)
-		kv = append(kv, "caller", fmt.Sprintf("%+v", c))
-	}
+	c := stack.Caller(1)
+	kv = append(kv, "caller", fmt.Sprintf("%+v", c))
 
-	stk := stack(e.StackTrace())
-	kv = append(kv, "stack", fmt.Sprint(stk))
+	stk := stack.NewCallStack(e.StackTrace())
+	kv = append(kv, "stack", fmt.Sprintf("%+v", stk))
 	kv = append(kv, keyvals...)
 	span.LogKV(kv...)
 }
